@@ -1,0 +1,38 @@
+<table id="missing">
+    <thead>
+        <tr>
+            <th nowrap=true>F Name</th>
+            <th nowrap=true>M Name</th>
+            <th nowrap=true>L Name</th>
+            <th>Nickname</th>
+            <th>Gender</th>
+            <th>Went missing on</th>
+            <th nowrap=true>at age</th>
+            <th>City</th>
+            <th>State</th>
+            <th>County</th>
+            <th>Region</th>
+            <th>Race/Ethnicity</th>
+            <th>Years Missing</th>
+        </tr>
+    </thead>
+
+<%= for missing <- @missing do %>
+    <tr>
+        <td><%= missing.first_name %></td>
+        <td><%= missing.middle_name %></td>
+        <td><%= missing.last_name %></td>
+        <td><%= missing.nickname %></td>
+        <td><%= missing.gender %></td>
+        <td><%= missing.last_seen_date %></td>
+        <td><%= missing.last_seen_age %></td>
+        <td><%= missing.last_seen_city %></td>
+        <td><%= missing.last_seen_state %></td>
+        <td><%= missing.last_seen_county %></td>
+        <td><%= missing.region %></td>
+        <td><%= missing.race_ethnicity %></td>
+        <td><%= missing.years_missing %></td>
+    </tr>
+<% end %>
+
+</table.

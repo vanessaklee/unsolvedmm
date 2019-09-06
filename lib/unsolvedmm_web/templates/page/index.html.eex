@@ -1,0 +1,2 @@
+<h1>Missing</h1>
+<%= live_render(@conn, UnsolvedmmWeb.MissingLive) %>

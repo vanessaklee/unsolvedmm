@@ -1,0 +1,20 @@
+/* This file is for your main application css. */
+
+@import "./phoenix.css";
+@import "../../deps/phoenix_live_view/assets/css/live_view.css";
+
+#missing table {
+    width: 100%;    
+    background-color: #f1f1c1;
+}
+
+#missing table th td {
+    border: 1px solid black;
+    border-collapse: collapse;
+    padding: 10px;
+    text-align: left;
+}
+
+#missing th {
+    font-size: small;
+}
