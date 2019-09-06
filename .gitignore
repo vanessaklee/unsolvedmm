@@ -38,3 +38,4 @@ npm-debug.log
 .mnesia
 Mnesia.nonode@nohost/
 .formatter.exs
+.DS_Store
