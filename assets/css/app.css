@@ -8,13 +8,17 @@
     background-color: #f1f1c1;
 }
 
-#missing table th td {
-    border: 1px solid black;
-    border-collapse: collapse;
-    padding: 10px;
+#missing table, td, th {
     text-align: left;
+    font-size: small;
+    padding-left: 5px;
+    padding-right: 5px;
+    border-bottom: 1px solid grey;
+    border-right: 1px solid grey;
+    vertical-align: top;
 }
 
-#missing th {
-    font-size: small;
+.filter-label {
+    font_size: small;
+    font-weight: normal !important;
 }

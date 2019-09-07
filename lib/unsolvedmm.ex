@@ -1,7 +1,7 @@
 Application.ensure_all_started(:hound)
 
 defmodule Unsolvedmm.Missing do
-  use Memento.Table, attributes: [:id, :first_name, :middle_name, :last_name, :nickname, :gender, :last_seen_date, :last_seen_age, :last_seen_city, :last_seen_state, :last_seen_county, :region, :race_ethnicity, :years_missing]
+  use Memento.Table, attributes: [:id, :source, :first_name, :middle_name, :last_name, :nickname, :gender, :last_seen_date, :last_seen_age, :last_seen_city, :last_seen_state, :last_seen_county, :region, :race_ethnicity, :years_missing, :image, :link]
 end
 
 defmodule Unsolvedmm do
@@ -18,128 +18,57 @@ defmodule Unsolvedmm do
   @regions nil
 
   def missing() do
-    # Mnesia.create_schema([node()])
-    # Mnesia.start()
-
-    # TODO handle failures
-    # TODO display failures?
-    # TODO compare missing to unidentified
-    # namus = parse_namus(namus_data())
-    # lost = parse_lost(lost_data())
-    # charley = parse_charley(charley_data())
-
-    # full = namus ++ lost
-    # full = namus
-    # sorted = Enum.sort_by(full, fn f -> Map.get(f, "last_name") end)
-
-    # case Mnesia.create_table(Missing, [attributes: [:id, :first_name, :middle_name, :last_name, :nickname, :gender, :last_seen_date, :last_seen_age, :last_seen_city, :last_seen_state, :last_seen_county, :region, :race_ethnicity, :years_missing]]) do 
-    #   {:atomic, :ok} -> write_data(sorted)
-    #     sorted
-    #   {:aborted, {:already_exists, Missing}} -> read_data()
-    #   _ -> %{} #TODO send human readable error message
-    # end
-
     case Memento.Table.create(Unsolvedmm.Missing) do
-      :ok -> 
-        full = parse_namus(namus_data())
-        sorted = Enum.sort_by(full, fn f -> Map.get(f, "last_name") end)
-        write_data(sorted)
-      {:error, {:already_exists, Unsolvedmm.Missing}} -> 
-        case read_data() do
-          [] -> 
-            full = parse_namus(namus_data())
-            sorted = Enum.sort_by(full, fn f -> Map.get(f, "last_name") end)
-            write_data(sorted)
-          data -> data
-        end
+      :ok -> read_data()
+      {:error, {:already_exists, Unsolvedmm.Missing}} -> read_data()
       _ -> [] #TODO send human readable error message
     end
   end
 
-  def write_data(datum) do
-    Memento.transaction! fn ->
-      for data <- datum do
-        Memento.Query.write(
-          %Unsolvedmm.Missing{
-            id: data.id, 
-            first_name: data.first_name,
-            middle_name: data.middle_name,
-            last_name: data.last_name,
-            nickname: data.nickname, 
-            gender: data.gender, 
-            last_seen_date: data.last_seen_date, 
-            last_seen_age: data.last_seen_age, 
-            last_seen_city: data.last_seen_city, 
-            last_seen_state: data.last_seen_state, 
-            last_seen_county: data.last_seen_county, 
-            region: data.region, 
-            race_ethnicity: data.race_ethnicity, 
-            years_missing: data.years_missing
-          }
-        )
-      end
-    end
-    # Mnesia.transaction(fn ->Mnesia.write({Missing,
-    #   data.id,
-    #   data.first_name,
-    #   data.middle_name,
-    #   data.last_name,
-    #   data.nickname, 
-    #   data.gender, 
-    #   data.last_seen_date, 
-    #   data.last_seen_age, 
-    #   data.last_seen_city, 
-    #   data.last_seen_state, 
-    #   data.last_seen_county, 
-    #   data.region, 
-    #   data.race_ethnicity, 
-    #   data.years_missing
-    # }) end)
-  end
-
   def read_data() do 
-    # {_, data} = Mnesia.transaction(fn ->:mnesia.match_object({Missing, :_, :_}) end)
-    # data
-    Memento.transaction! fn -> Memento.Query.all(Unsolvedmm.Missing) end
+    case Memento.transaction! fn -> Memento.Query.all(Unsolvedmm.Missing) end do
+      [] -> IO.inspect parse_namus(namus_data())
+        read_data()
+      data -> data
+    end
   end
 
   def parse_namus(results) do
     data = Map.get(results, "results")
 
-    Enum.map(data, fn r ->
-      state = Map.get(r, "stateDisplayNameOfLastContact")
+    Memento.transaction! fn ->
+      Enum.map(data, fn r ->
+        state = Map.get(r, "stateDisplayNameOfLastContact")
 
-      ethnicity =
-        case is_list(Map.get(r, "raceEthnicity")) do
-          true -> List.to_string(List.flatten(Map.get(r, "raceEthnicity")))
-          false -> Map.get(r, "raceEthnicity")
-        end
+        ethnicity =
+          case is_list(Map.get(r, "raceEthnicity")) do
+            true -> List.to_string(List.flatten(Map.get(r, "raceEthnicity")))
+            false -> Map.get(r, "raceEthnicity")
+          end
 
-      %{
-        :source => :namus,
-        :id => Map.get(r, "idFormatted"),
-        :first_name => capitalize(Map.get(r, "firstName")),
-        :middle_name => capitalize(Map.get(r, "middle_name")),
-        :last_name => capitalize(Map.get(r, "lastName")),
-        :last_seen_date => Map.get(r, "dateOfLastContact"),
-        :last_seen_min_age => Map.get(r, "computedMissingMinAge"),
-        :last_seen_age => Map.get(r, "computedMissingMaxAge"),
-        :last_seen_city => Map.get(r, "cityOfLastContact"),
-        :last_seen_county => Map.get(r, "countyDisplayNameOfLastContact"),
-        :last_seen_state => state,
-        :nickname => Map.get(r, "nickname"),
-        :race_ethnicity => ethnicity,
-        :region => find_region_by_state(state),
-        :gender => Map.get(r, "gender"),
-        :details => Map.get(r, "text"),
-        :last_updated => Map.get(r, "image"),
-        :image => Map.get(r, "primary_photo"),
-        :link => Map.get(r, "link"),
-        :years_missing => Map.get(r, "missingAgeRangeValue"),
-        :current_age_top => Map.get(r, "currentAgeFrom"),
-        :current_age_bottom => Map.get(r, "currentAgeTo")
-      }
-    end)
+          Memento.Query.write(
+            %Unsolvedmm.Missing{
+              id: Map.get(r, "idFormatted"), 
+              source: :namus,
+              first_name: capitalize(Map.get(r, "firstName")),
+              middle_name: capitalize(Map.get(r, "middle_name")),
+              last_name: capitalize(Map.get(r, "lastName")),
+              nickname: Map.get(r, "nickname"), 
+              gender: Map.get(r, "gender"), 
+              last_seen_date: Map.get(r, "dateOfLastContact"), 
+              last_seen_age: Map.get(r, "computedMissingMaxAge"), 
+              last_seen_city: Map.get(r, "cityOfLastContact"), 
+              last_seen_state: state, 
+              last_seen_county: Map.get(r, "countyDisplayNameOfLastContact"), 
+              region: find_region_by_state(state), 
+              race_ethnicity: Map.get(r, "nickname"), 
+              years_missing: Map.get(r, "missingAgeRangeValue"),
+              image: Map.get(r, "primary_photo"),
+              link: Map.get(r, "link")
+            }
+          )
+      end)
+    end
   end
 
   def parse_lost(results) do
