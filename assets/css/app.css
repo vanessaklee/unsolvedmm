@@ -1,7 +1,14 @@
 /* This file is for your main application css. */
 
-@import "./phoenix.css";
-@import "../../deps/phoenix_live_view/assets/css/live_view.css";
+
+.input.input { 
+    height: 3rem !important;
+    margin-bottom: 5px !important;
+}
+
+.ac_form {
+    margin-bottom: 5px !important;
+}
 
 #missing table {
     width: 100%;    
@@ -22,3 +29,6 @@
     font_size: small;
     font-weight: normal !important;
 }
+
+@import "./phoenix.css";
+@import "../../deps/phoenix_live_view/assets/css/live_view.css";

@@ -27,22 +27,24 @@ alias UnsolvedmmWeb.MissingView
             {:region, "Region"}, 
             {:years_missing, "How long?"}
         ]
+        show_sort_arrows = [:first_name, :middle_name, :last_name, :race_ethnicity, :last_seen_age, :last_seen_city, :last_seen_state, :last_seen_county, :region, :years_missing]
         show_cols = Enum.map(cols, fn {col,_} -> {col,"true"} end) |> Enum.into(%{}) |> Map.put(:nickname, "false") |> Map.put(:middle_name, "false")
-        {:ok, assign(socket, rows: rows, show_cols: show_cols, cols: cols, mode: :hide_filters, filter: %{}, ac_loading: false, ac_matches: [], ac_entry: "" )}
-        # {:ok, assign(socket, missing: missing)}
+        
+        {:ok, assign(socket, 
+            rows: rows, 
+            show_cols: show_cols, 
+            cols: cols, 
+            filter: %{}, 
+            ac_loading: false, 
+            ac_matches: [], 
+            ac_entry: "", 
+            show_sort_arrows: show_sort_arrows 
+        )}
     end
 
     def handle_event("show_cols", string_checked_cols , socket) do
         checked_cols = for {key, val} <- string_checked_cols, into: %{}, do: {String.to_atom(key), val}
         {:noreply, assign(socket, show_cols: checked_cols)}
-    end
-
-    def handle_event("toggle-mode", _, socket) do
-        {:noreply,
-         update(socket, :mode, fn
-           :show_filters -> :hide_filters
-           :hide_filters -> :show_filters
-        end)}
     end
 
     def handle_event("sort", %{"col" => col, "action" => action}, socket) do
@@ -57,46 +59,46 @@ alias UnsolvedmmWeb.MissingView
     end
 
     def handle_event("filter", filter, socket) do
-        IO.inspect "filter et al"
-        IO.inspect filter
+        keys = Map.keys(filter)
+        head_key = hd(Map.keys(filter))
+        [head_val] = filter[head_key]
 
-
-        key = hd(Map.keys(filter))
-        val = filter[key]
-        IO.inspect key
-        IO.inspect val
-
-
-        new_filter = case val do
-            "All" -> socket.assigns.filter |> Map.delete(key)
+        new_filter = case head_val do
+            "All" -> socket.assigns.filter |> Map.delete(head_key)
               _   -> socket.assigns.filter |> Map.merge(filter)
         end
 
-        [value] = val
-
-        IO.inspect "-------"
-        IO.inspect filter[value]
-
-        filter_rows = get_filter_rows(value, filter[value])
-
+        filter_rows = 
+            Enum.reduce(keys, Unsolvedmm.missing(), fn 
+                (x, acc) when x=="_target" -> acc
+                (x, acc) ->
+                    case is_nil(filter[x]) || filter[x] == "" do
+                        true -> acc
+                        false -> 
+                            case x do
+                                "ac_first_name" -> get_ac_filter_rows(acc, "first_name", filter[x]) # autocomplete
+                                "sw_first_name" -> get_filter_rows(acc, "first_name", filter[x]) # filter by beginning letter
+                                _ -> acc
+                            end
+                    end
+            end)
         {:noreply, assign(socket, rows: filter_rows, filter: new_filter)}
-        # {:noreply, assign(socket, :rows, Unsolvedmm.missing() )}
     end
 
     def handle_event("suggest", %{"ac" => ac}, socket) when byte_size(ac) <= 100 do
-        ac_matches = get_ac_filter_rows("first_name", ac)
-        {:noreply, assign(socket, rows: ac_matches)}
+        # ac_matches = get_ac_filter_rows("first_name", ac)
+        # {:noreply, assign(socket, rows: ac_matches)}
     end
 
-    def get_filter_rows(key, value) do
-        Unsolvedmm.missing()
+    def get_filter_rows(rows, key, value) do
+        rows
         |> Enum.filter(fn x -> 
             String.starts_with?(Map.get(x, String.to_atom(key)), value)
         end)
     end
 
-    def get_ac_filter_rows(key, value) do
-        Unsolvedmm.missing()
+    def get_ac_filter_rows(rows, key, value) do
+        rows
         |> Enum.filter(fn x -> 
             String.contains?(String.downcase(Map.get(x, String.to_atom(key))), String.downcase(value))
         end)
@@ -115,12 +117,6 @@ alias UnsolvedmmWeb.MissingView
             <% end %>
         </form>
 
-        <%= if @mode == :hide_filters do %>
-            <input type="hidden" phx-click="toggle-mode" value="Show filters">
-        <% else %>
-            <input type="hidden" phx-click="toggle-mode" value="Hide filters">
-        <% end %>
-
         <table id="missing" >
         <thead>
             <tr>
@@ -133,24 +129,31 @@ alias UnsolvedmmWeb.MissingView
                 <%= if @show_cols[col]==="true" do %> 
                     <th>
                         <%= title %>
-                        <%= if (col in [:first_name, :middle_name, :last_name, :race_ethnicity, :last_seen_age, :last_seen_city, :last_seen_state, :last_seen_county, :region, :years_missing]) do %> 
+                        <%= if (col in @show_sort_arrows) do %> 
                             <a href="#" phx-click="sort" phx-value-col=<%= col %> phx-value-action="asc">&uarr;</a> 
                             <a href="#" phx-click="sort" phx-value-col=<%= col %> phx-value-action="des">&darr;</a> 
                         <% end %>
                         <%= if (col in [:first_name, :middle_name, :last_name, :last_seen_city, :last_seen_state, :last_seen_county, :region]) do %>
-                            <form phx-change="filter">
+                            <form phx-change="filter" style="margin-bottom: 5px !important;">
                                 <span class="filter-label">starts with</span>
-                                <SELECT name="<%= col %>">
+                                <SELECT class="input" name="sw_<%= col %>"1>
                                 <option value=""> </option>
                                 <%= for letter <- ?A..?Z do %>
                                     <option value=<%= << letter :: utf8 >> %>><%= << letter :: utf8 >> %></option>
                                 <% end %>
+                                <input type="text" class="input" name="ac_first_name" value="<%= @ac_entry %>" list="ac_matches" placeholder="Begin typing..."
+                                    <%= if @ac_loading, do: "readonly" %>/>
+                                <datalist id="ac_matches">
+                                <%= for ac_match <- @ac_matches do %>
+                                    <option value="<%= ac_match %>"><%= ac_match %></option>
+                                <% end %>
+                                </datalist>
                                 </SELECT>
                             </form>
                         <% end %>
                         <%= if col in [:first_name] do %>
-                            <form phx-change="suggest" phx-value-col="<%= col %>">
-                                <input type="text" name="ac" value="<%= @ac_entry %>" list="ac_matches" placeholder="Begin typing..."
+                            <form class="ac_form" style="margin-bottom: 5px !important;" phx-change="suggest" phx-value-col="<%= col %>">
+                                <input type="text" class="input" name="ac" value="<%= @ac_entry %>" list="ac_matches" placeholder="Begin typing..."
                                     <%= if @ac_loading, do: "readonly" %>/>
                                 <datalist id="ac_matches">
                                 <%= for ac_match <- @ac_matches do %>
