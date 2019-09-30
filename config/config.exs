@@ -17,7 +17,7 @@ config :unsolvedmm, UnsolvedmmWeb.Endpoint,
   pubsub: [name: Unsolvedmm.PubSub, adapter: Phoenix.PubSub.PG2],
   server: true,
   live_view: [
-    signing_salt: "N6pOoVXLLx4EzwZkFmTdNWrQQKuZy1kJ"
+    signing_salt: "bxF5OGDBXv+vtrfDKXKA41X7bQ3qvuEqUvDzdOhkbu7LNOVYjbuUcDWaa2zNdQh/"
   ]
 
 # Configures Elixir's Logger

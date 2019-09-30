@@ -27,7 +27,7 @@ defmodule Unsolvedmm do
 
   def read_data() do 
     case Memento.transaction! fn -> Memento.Query.all(Unsolvedmm.Missing) end do
-      [] -> IO.inspect parse_namus(namus_data())
+      [] -> parse_namus(namus_data())
         read_data()
       data -> data
     end
@@ -200,28 +200,6 @@ defmodule Unsolvedmm do
           |> String.split("/")
           |> List.last()
 
-        # missing_since = find_element(:xpath, ~s|//*[@id="case-top"]/div/div[2]/ul/li[1]|) 
-        #   |> visible_text()
-        #   |> String.replace("Missing Since\n", "")
-        # missing_from = find_element(:xpath, ~s|//*[@id="case-top"]/div/div[2]/ul/li[2]|) 
-        #   |> visible_text()
-        #   |> String.replace("Missing From\n", "")
-
-        # full_dob = find_element(:xpath, ~s|//*[@id="case-top"]/div/div[2]/ul/li[4]|) 
-        #   |> visible_text()
-        #   |> String.replace("Date of Birth\n", "")
-        # [dob, parenthetical_age] = case String.contains?(full_dob, " ") do
-        #   true -> String.split(full_dob, " ")
-        #   false -> [full_dob, nil]
-        # end
-        # current_age = String.replace(parenthetical_age, "(", "") |> String.replace(")", "")
-        # last_seen_age = find_element(:xpath, ~s|//*[@id="case-top"]/div/div[2]/ul/li[5]|) |> visible_text()
-        #   |> String.replace(" years old", "")
-        #   |> String.replace(" months old", "")
-        # h_w = find_element(:xpath, ~s|//*[@id="case-top"]/div/div[2]/ul/li[6]|) |> visible_text()
-
-        # chars = find_element(:xpath, ~s|//*[@id="case-top"]/div/div[2]/ul/li[8]|) |> visible_text()
-
         case_text =
           ps_lvl_2
           |> Floki.find("#case-top")
@@ -334,7 +312,7 @@ defmodule Unsolvedmm do
 
         details = find_element(:xpath, ~s|//*[@id="case-bottom"]/div/div[1]|) |> visible_text()
 
-        IO.inspect(%{
+        %{
           "source" => :charley,
           "id" => id,
           "race_ethnicity" => race,
@@ -360,7 +338,7 @@ defmodule Unsolvedmm do
           "current_age_bottom" => current_age,
           "height" => height,
           "weight" => weight <> "lbs"
-        })
+        }
       end)
 
     Hound.end_session()

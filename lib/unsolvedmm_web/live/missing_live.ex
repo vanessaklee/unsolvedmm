@@ -17,7 +17,7 @@ alias UnsolvedmmWeb.MissingView
             {:middle_name, "Middle"}, 
             {:last_name, "Last"}, 
             {:nickname, "Nickname"}, 
-            {:gender, "Gender"}, 
+            {:gender, "Sex"}, 
             {:race_ethnicity, "Race/Ethnicity"},
             {:last_seen_date, "Date"}, 
             {:last_seen_age, "Age"}, 
@@ -47,18 +47,27 @@ alias UnsolvedmmWeb.MissingView
         {:noreply, assign(socket, show_cols: checked_cols)}
     end
 
-    def handle_event("sort", %{"col" => col, "action" => action}, socket) do
+    # def handle_event("sort", %{"col" => col, "action" => action}, socket) do
+    #     rows = Unsolvedmm.missing()
+    #         |> Enum.sort(fn(rec1, rec2) -> 
+    #             case action do
+    #                 "asc" -> Map.get(rec1, String.to_atom(col)) < Map.get(rec2, String.to_atom(col))
+    #                 "des" -> Map.get(rec1, String.to_atom(col)) > Map.get(rec2, String.to_atom(col))
+    #             end 
+    #         end)
+    #     {:noreply, assign(socket, :rows, rows)}
+    # end
+
+    def handle_event("reset_filter", filter, socket) do
+        keys = Map.keys(filter)
+        new_filter = for k <- keys, do: Map.replace!(filter, k, nil)
         rows = Unsolvedmm.missing()
-            |> Enum.sort(fn(rec1, rec2) -> 
-                case action do
-                    "asc" -> Map.get(rec1, String.to_atom(col)) < Map.get(rec2, String.to_atom(col))
-                    "des" -> Map.get(rec1, String.to_atom(col)) > Map.get(rec2, String.to_atom(col))
-                end 
-            end)
-        {:noreply, assign(socket, :rows, rows)}
+        # TODO: clear fields etc.
+        {:noreply, assign(socket, rows: rows, filter: new_filter)}
     end
 
     def handle_event("filter", filter, socket) do
+        IO.inspect filter
         keys = Map.keys(filter)
         head_key = hd(Map.keys(filter))
         [head_val] = filter[head_key]
@@ -68,16 +77,20 @@ alias UnsolvedmmWeb.MissingView
               _   -> socket.assigns.filter |> Map.merge(filter)
         end
 
+        # TODO: pop the _target filter and run it last to give it priority?
+
         filter_rows = 
             Enum.reduce(keys, Unsolvedmm.missing(), fn 
                 (x, acc) when x=="_target" -> acc
                 (x, acc) ->
+                    {type, field} = String.split_at(x, 3)
                     case is_nil(filter[x]) || filter[x] == "" do
                         true -> acc
                         false -> 
-                            case x do
-                                "ac_first_name" -> get_ac_filter_rows(acc, "first_name", filter[x]) # autocomplete
-                                "sw_first_name" -> get_filter_rows(acc, "first_name", filter[x]) # filter by beginning letter
+                            case type do
+                                t when t in ["asc_", "des"] -> sort(t, acc, field)
+                                "ac_" -> get_ac_filter_rows(acc, field, filter[x]) # autocomplete
+                                "tg_" -> get_ac_filter_rows(acc, field, filter[x]) # toggle gender
                                 _ -> acc
                             end
                     end
@@ -85,15 +98,20 @@ alias UnsolvedmmWeb.MissingView
         {:noreply, assign(socket, rows: filter_rows, filter: new_filter)}
     end
 
-    def handle_event("suggest", %{"ac" => ac}, socket) when byte_size(ac) <= 100 do
-        # ac_matches = get_ac_filter_rows("first_name", ac)
-        # {:noreply, assign(socket, rows: ac_matches)}
-    end
+    # def get_filter_rows(rows, key, value) do
+    #     rows
+    #     |> Enum.filter(fn x -> 
+    #         String.starts_with?(Map.get(x, String.to_atom(key)), value)
+    #     end)
+    # end
 
-    def get_filter_rows(rows, key, value) do
+    def sort(action, rows, key) do
         rows
-        |> Enum.filter(fn x -> 
-            String.starts_with?(Map.get(x, String.to_atom(key)), value)
+        |> Enum.sort(fn(rec1, rec2) -> 
+            case action do
+                "asc" -> Map.get(rec1, String.to_atom(key)) < Map.get(rec2, String.to_atom(key))
+                "des" -> Map.get(rec1, String.to_atom(key)) > Map.get(rec2, String.to_atom(key))
+            end 
         end)
     end
 
@@ -114,58 +132,55 @@ alias UnsolvedmmWeb.MissingView
             <%= for {col,title} <- @cols do %>
                 <input name="<%= col %>" type="hidden" value="false">
                 <input type="checkbox" name="<%= col %>" value="true" <%= checked?(@show_cols[col]) %> ><%= title %>
-            <% end %>
+            <% end %><input type="button" phx-click="rest_filter" value="Reset Filters" class="btn btn-primary btn-sm">
         </form>
+
+        
 
         <table id="missing" >
         <thead>
             <tr>
                 <th colspan="4" scope="colgroup">Name</th>
                 <th colspan="2" scope="colgroup"></th>
-                <th colspan="7" scope="colgroup">Went Missing</th>
+                <th colspan="7" scope="colgroup">Missing from . . . </th>
             </tr>
             <tr>
             <%= for {col,title} <- @cols do %>
                 <%= if @show_cols[col]==="true" do %> 
-                    <th>
+                    <th nowrap>
                         <%= title %>
                         <%= if (col in @show_sort_arrows) do %> 
-                            <a href="#" phx-click="sort" phx-value-col=<%= col %> phx-value-action="asc">&uarr;</a> 
-                            <a href="#" phx-click="sort" phx-value-col=<%= col %> phx-value-action="des">&darr;</a> 
-                        <% end %>
-                        <%= if (col in [:first_name, :middle_name, :last_name, :last_seen_city, :last_seen_state, :last_seen_county, :region]) do %>
-                            <form phx-change="filter" style="margin-bottom: 5px !important;">
-                                <span class="filter-label">starts with</span>
-                                <SELECT class="input" name="sw_<%= col %>"1>
-                                <option value=""> </option>
-                                <%= for letter <- ?A..?Z do %>
-                                    <option value=<%= << letter :: utf8 >> %>><%= << letter :: utf8 >> %></option>
-                                <% end %>
-                                <input type="text" class="input" name="ac_first_name" value="<%= @ac_entry %>" list="ac_matches" placeholder="Begin typing..."
-                                    <%= if @ac_loading, do: "readonly" %>/>
-                                <datalist id="ac_matches">
-                                <%= for ac_match <- @ac_matches do %>
-                                    <option value="<%= ac_match %>"><%= ac_match %></option>
-                                <% end %>
-                                </datalist>
-                                </SELECT>
-                            </form>
-                        <% end %>
-                        <%= if col in [:first_name] do %>
-                            <form class="ac_form" style="margin-bottom: 5px !important;" phx-change="suggest" phx-value-col="<%= col %>">
-                                <input type="text" class="input" name="ac" value="<%= @ac_entry %>" list="ac_matches" placeholder="Begin typing..."
-                                    <%= if @ac_loading, do: "readonly" %>/>
-                                <datalist id="ac_matches">
-                                <%= for ac_match <- @ac_matches do %>
-                                    <option value="<%= ac_match %>"><%= ac_match %></option>
-                                <% end %>
-                                </datalist>
-                            </form>
-
+                            <a href="#" phx-click="filter" phx-value-col=<%= col %> phx-value-action="asc">&uarr;</a> 
+                            <a href="#" phx-click="filter" phx-value-col=<%= col %> phx-value-action="des">&darr;</a> 
                         <% end %>
                     </th>
                 <% end %>
             <% end %>
+            </tr>
+            <tr>
+                <form phx-change="filter" style="margin-bottom: 5px !important;">
+                    <%= for {col,title} <- @cols do %>
+                        <%= if @show_cols[col]==="true" do %> 
+                            <th nowrap>
+                                <%= if (col in @show_sort_arrows) do %> 
+                                    <span class="filter-label">sort</span> <SELECT class="input" name="sw_<%= col %>"1>
+                                        <option value=""> </option>
+                                        <option value="asc">A->Z</option>
+                                        <option value="des">Z->A</option>
+                                    </select>
+                                <% end %>
+                                <%= if (col == :gender) do %>  
+                                    <input type="radio" name="tg_gender" value="Female">Female</input></br>
+                                    <input type="radio" name="tg_gender" value="Male">Male</input></br>
+                                    <input type="radio" name="tg_gender" value="Unsure">Non-binary</input>
+                                <% end %>
+                                <%= if (col in [:first_name, :middle_name, :last_name, :last_seen_city, :last_seen_state, :last_seen_county, :region]) do %>  
+                                    <br/><span class="filter-label">contains <input type="text" class="input text" name="ac_<%= col %>" value="<%= @ac_entry %>" list="ac_matches" placeholder="Begin typing..." <%= if @ac_loading, do: "readonly" %>/></span> 
+                                <% end %>
+                            </th>
+                        <% end %>
+                    <% end %>
+                </form>
             </tr>
         </thead>
         <tbody>
