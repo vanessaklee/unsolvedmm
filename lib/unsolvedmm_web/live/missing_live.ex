@@ -87,8 +87,11 @@ alias UnsolvedmmWeb.MissingView
                     case is_nil(filter[x]) || filter[x] == "" do
                         true -> acc
                         false -> 
+                            IO.inspect "-------"
+                            IO.inspect type
+                            IO.inspect field
                             case type do
-                                t when t in ["asc_", "des"] -> sort(t, acc, field)
+                                "sw_" -> sort(filter[x], acc, field)
                                 "ac_" -> get_ac_filter_rows(acc, field, filter[x]) # autocomplete
                                 "tg_" -> get_ac_filter_rows(acc, field, filter[x]) # toggle gender
                                 _ -> acc
@@ -163,16 +166,20 @@ alias UnsolvedmmWeb.MissingView
                         <%= if @show_cols[col]==="true" do %> 
                             <th nowrap>
                                 <%= if (col in @show_sort_arrows) do %> 
-                                    <span class="filter-label">sort</span> <SELECT class="input" name="sw_<%= col %>"1>
+                                    <span class="filter-label">sort</span> <SELECT class="input" name="sw_<%= col %>">
                                         <option value=""> </option>
                                         <option value="asc">A->Z</option>
                                         <option value="des">Z->A</option>
                                     </select>
                                 <% end %>
                                 <%= if (col == :gender) do %>  
-                                    <input type="radio" name="tg_gender" value="Female">Female</input></br>
-                                    <input type="radio" name="tg_gender" value="Male">Male</input></br>
-                                    <input type="radio" name="tg_gender" value="Unsure">Non-binary</input>
+                                    <SELECT class="input" name="tg_gender">
+                                        <option value=""> </option>
+                                        <option value="female">Female</option>
+                                        <option value="male">Male</option>
+                                        <option value="unsure">Non-binary</option>
+                                        <option value="unknown">Unknown</option>
+                                    </select>
                                 <% end %>
                                 <%= if (col in [:first_name, :middle_name, :last_name, :last_seen_city, :last_seen_state, :last_seen_county, :region]) do %>  
                                     <br/><span class="filter-label">contains <input type="text" class="input text" name="ac_<%= col %>" value="<%= @ac_entry %>" list="ac_matches" placeholder="Begin typing..." <%= if @ac_loading, do: "readonly" %>/></span> 
