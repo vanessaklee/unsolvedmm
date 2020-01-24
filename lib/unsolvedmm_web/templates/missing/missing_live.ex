@@ -18,7 +18,7 @@ alias UnsolvedmmWeb.MissingView
             {:last_name, "Last"}, 
             {:nickname, "Nickname"}, 
             {:gender, "Sex"}, 
-            {:race_ethnicity, "Race/Ethnicity"},
+            {:race_ethnicity, "Ethnicity"},
             {:last_seen_date, "Date"}, 
             {:last_seen_age, "Age"}, 
             {:last_seen_city, "City"}, 
@@ -66,16 +66,40 @@ alias UnsolvedmmWeb.MissingView
         {:noreply, assign(socket, rows: rows, filter: new_filter)}
     end
 
-    def handle_event("filter", filter, socket) do
+    def handle_filter(socket, nil, _), do: nil
+    def handle_filter(socket, filter, key) do
+        case String.contains?(key, "sw_") do
+            true ->
+                case filter[key] do
+                    nil -> Map.replace!(filter, key, "asc")
+                    "" -> Map.replace!(filter, key, "asc")
+                    "asc" -> Map.replace!(filter, key, "des")
+                    "des" -> Map.replace!(filter, key, "asc")
+                    assign(socket, filter: filter)
+                end
+            false -> filter
+        end
+    end
+
+    def handle_event("filter", f, socket) do
+        keys = Map.keys(f)
+        head_key = hd(Map.keys(f))
+        [head_val] = f[head_key]
+        filter = handle_filter(socket, f, head_val)
+
+        IO.inspect "--------------------------"
+        
+        IO.inspect socket.assigns.filter
+        IO.inspect f
         IO.inspect filter
-        keys = Map.keys(filter)
-        head_key = hd(Map.keys(filter))
-        [head_val] = filter[head_key]
 
         new_filter = case head_val do
             "All" -> socket.assigns.filter |> Map.delete(head_key)
               _   -> socket.assigns.filter |> Map.merge(filter)
         end
+
+        IO.inspect new_filter
+        IO.inspect socket.assigns.filter 
 
         # TODO: pop the _target filter and run it last to give it priority?
 
@@ -118,10 +142,20 @@ alias UnsolvedmmWeb.MissingView
         end)
     end
 
+    def get_ac_filter_rows(rows, _, nil), do: rows
+    def get_ac_filter_rows(rows, _, ""), do: rows
+    def get_ac_filter_rows(rows, nil, _), do: rows
+    def get_ac_filter_rows(rows, "", _), do: rows
     def get_ac_filter_rows(rows, key, value) do
         rows
         |> Enum.filter(fn x -> 
-            String.contains?(String.downcase(Map.get(x, String.to_atom(key))), String.downcase(value))
+            case Map.get(x, String.to_atom(key)) do
+                nil -> x
+                "" -> x
+                good_val -> String.contains?(String.downcase(good_val), String.downcase(value))
+                _ -> x
+            end
+            
         end)
     end
 
@@ -131,14 +165,65 @@ alias UnsolvedmmWeb.MissingView
 
     def render(assigns) do
         ~L"""
-        <form phx-change="show_cols">
-            <%= for {col,title} <- @cols do %>
-                <input name="<%= col %>" type="hidden" value="false">
-                <input type="checkbox" name="<%= col %>" value="true" <%= checked?(@show_cols[col]) %> ><%= title %>
-            <% end %><input type="button" phx-click="rest_filter" value="Reset Filters" class="btn btn-primary btn-sm">
-        </form>
+        <div id="menu" class="menu">
+            <div class="container">
+                <div class="author-content">
+                    <h4>Unsolved Search</h4>
+                    <span>Missing</span>
+                </div>
 
-        
+                <div class="filters-text">
+                    <form phx-change="filter" style="margin-bottom: 5px !important;">
+                        <%= for {col,title} <- @cols do %>
+                            <%= if @show_cols[col]==="true" do %> 
+                                <th nowrap>
+                                    <%= if (col in @show_sort_arrows) do %> 
+                                        <span class="filter-label">sort</span> 
+                                        <input class="input sort-font" name="sw_<%= col %>" type="radio" phx-value"asc">
+                                        <input class="input sort-font" name="sw_<%= col %>" type="radio" phx-value"des">
+
+                                        <input id="sort-<%= col %>" class="input sort-font" name="sw_<%= col %>" type="checkbox" phx-value"what">
+                                        <SELECT class="input" name="sw_<%= col %>">
+                                            <option value=""> </option>
+                                            <option value="asc">A->Z</option>
+                                            <option value="des">Z->A</option>
+                                        </select>
+                                    <% end %>
+                                    <%= if (col == :gender) do %>  
+                                        <SELECT class="input" name="tg_gender">
+                                            <option value=""> </option>
+                                            <option value="female">Female</option>
+                                            <option value="male">Male</option>
+                                            <option value="unsure">Non-binary</option>
+                                            <option value="unknown">Unknown</option>
+                                        </select>
+                                    <% end %>
+                                    <%= if (col in [:first_name, :middle_name, :last_name, :last_seen_city, :last_seen_state, :last_seen_county, :region]) do %>  
+                                        <br/><span class="filter-label">contains <input type="text" class="input text" name="ac_<%= col %>" value="<%= @ac_entry %>" list="ac_matches" placeholder="Begin typing..." <%= if @ac_loading, do: "readonly" %>/></span> 
+                                    <% end %>
+                                </th>
+                            <% end %>
+                        <% end %>
+                    </form>                    
+                    <input type="button" phx-click="rest_filter" value="Reset Filters" class="btn btn-primary btn-sm">
+                </div>
+
+                <form phx-change="show_cols">
+                <ul class="display-columns">
+                    <%= for {col,title} <- @cols do %>
+                        <li><input name="<%= col %>" type="hidden" value="false">
+                        <input type="checkbox" name="<%= col %>" value="true" <%= checked?(@show_cols[col]) %> ><%= title %></li>
+                    <% end %>
+                </ul>
+                </form>
+                
+                <div class="copyright-text">
+                    <p>Copyright 2020 Vanessa Lee<br></p>
+                </div>
+            </div>
+        </div>
+
+        <div id="contentbox" class="contentbox">
 
         <table id="missing" >
         <thead>
@@ -202,6 +287,7 @@ alias UnsolvedmmWeb.MissingView
             <% end %>
         </tbody>
         </table>
+        </div>
         """
         # MissingView.render("missing.html", assigns)
     end
