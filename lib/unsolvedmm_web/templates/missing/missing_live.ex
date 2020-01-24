@@ -13,11 +13,11 @@ alias UnsolvedmmWeb.MissingView
     def mount(_session, socket) do
         rows = Unsolvedmm.missing()
         cols = [
-            {:first_name, "First"}, 
-            {:middle_name, "Middle"}, 
-            {:last_name, "Last"}, 
+            {:first_name, "First Name"}, 
+            {:middle_name, "Middle Name"}, 
+            {:last_name, "Last Name"}, 
             {:nickname, "Nickname"}, 
-            {:gender, "Sex"}, 
+            {:gender, "Gender"}, 
             {:race_ethnicity, "Ethnicity"},
             {:last_seen_date, "Date"}, 
             {:last_seen_age, "Age"}, 
@@ -66,40 +66,16 @@ alias UnsolvedmmWeb.MissingView
         {:noreply, assign(socket, rows: rows, filter: new_filter)}
     end
 
-    def handle_filter(socket, nil, _), do: nil
-    def handle_filter(socket, filter, key) do
-        case String.contains?(key, "sw_") do
-            true ->
-                case filter[key] do
-                    nil -> Map.replace!(filter, key, "asc")
-                    "" -> Map.replace!(filter, key, "asc")
-                    "asc" -> Map.replace!(filter, key, "des")
-                    "des" -> Map.replace!(filter, key, "asc")
-                    assign(socket, filter: filter)
-                end
-            false -> filter
-        end
-    end
-
-    def handle_event("filter", f, socket) do
-        keys = Map.keys(f)
-        head_key = hd(Map.keys(f))
-        [head_val] = f[head_key]
-        filter = handle_filter(socket, f, head_val)
-
-        IO.inspect "--------------------------"
-        
-        IO.inspect socket.assigns.filter
-        IO.inspect f
+    def handle_event("filter", filter, socket) do
         IO.inspect filter
+        keys = Map.keys(filter)
+        head_key = hd(Map.keys(filter))
+        [head_val] = filter[head_key]
 
         new_filter = case head_val do
             "All" -> socket.assigns.filter |> Map.delete(head_key)
               _   -> socket.assigns.filter |> Map.merge(filter)
         end
-
-        IO.inspect new_filter
-        IO.inspect socket.assigns.filter 
 
         # TODO: pop the _target filter and run it last to give it priority?
 
@@ -111,9 +87,6 @@ alias UnsolvedmmWeb.MissingView
                     case is_nil(filter[x]) || filter[x] == "" do
                         true -> acc
                         false -> 
-                            IO.inspect "-------"
-                            IO.inspect type
-                            IO.inspect field
                             case type do
                                 "sw_" -> sort(filter[x], acc, field)
                                 "ac_" -> get_ac_filter_rows(acc, field, filter[x]) # autocomplete
@@ -176,37 +149,41 @@ alias UnsolvedmmWeb.MissingView
                     <form phx-change="filter" style="margin-bottom: 5px !important;">
                         <%= for {col,title} <- @cols do %>
                             <%= if @show_cols[col]==="true" do %> 
-                                <th nowrap>
+                                <div class="filter-div">
+                                <table id="filters" style="border: 0; margin-bottom: -1.5rem !important;"><tr>
+                                <td>
+                                <span class="filter-label"><%= title%></span> 
+                                
                                     <%= if (col in @show_sort_arrows) do %> 
-                                        <span class="filter-label">sort</span> 
-                                        <input class="input sort-font" name="sw_<%= col %>" type="radio" phx-value"asc">
-                                        <input class="input sort-font" name="sw_<%= col %>" type="radio" phx-value"des">
-
-                                        <input id="sort-<%= col %>" class="input sort-font" name="sw_<%= col %>" type="checkbox" phx-value"what">
-                                        <SELECT class="input" name="sw_<%= col %>">
-                                            <option value=""> </option>
-                                            <option value="asc">A->Z</option>
-                                            <option value="des">Z->A</option>
+                                        <SELECT multiple class="input fancy" name="sw_<%= col %>">
+                                            <option value="asc">&#xf062 A-Z</option>
+                                            <option value="des">&#xf063 Z-A</i></option>
                                         </select>
                                     <% end %>
                                     <%= if (col == :gender) do %>  
-                                        <SELECT class="input" name="tg_gender">
-                                            <option value=""> </option>
+                                        <SELECT class="input full-select" name="tg_gender">
+                                            <option value=""></option>
                                             <option value="female">Female</option>
                                             <option value="male">Male</option>
                                             <option value="unsure">Non-binary</option>
                                             <option value="unknown">Unknown</option>
                                         </select>
                                     <% end %>
+                                </td>
+                                <td>
                                     <%= if (col in [:first_name, :middle_name, :last_name, :last_seen_city, :last_seen_state, :last_seen_county, :region]) do %>  
-                                        <br/><span class="filter-label">contains <input type="text" class="input text" name="ac_<%= col %>" value="<%= @ac_entry %>" list="ac_matches" placeholder="Begin typing..." <%= if @ac_loading, do: "readonly" %>/></span> 
+                                        <span class="filter-text">Contains &nbsp;<input type="text" class="input text" name="ac_<%= col %>" value="<%= @ac_entry %>" list="ac_matches" placeholder="Begin typing..." <%= if @ac_loading, do: "readonly" %>/></span> 
                                     <% end %>
-                                </th>
+                                
+                                </td></tr></table>
+                                </div>
                             <% end %>
                         <% end %>
                     </form>                    
                     <input type="button" phx-click="rest_filter" value="Reset Filters" class="btn btn-primary btn-sm">
                 </div>
+
+                <div class="display-columns"><span class="filter-label">Displayed Columns</span> </div>
 
                 <form phx-change="show_cols">
                 <ul class="display-columns">
